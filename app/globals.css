@@ -1,0 +1,607 @@
+:root {
+  --bg: #f7f3eb;
+  --panel: rgba(255, 255, 255, 0.78);
+  --ink: #18202b;
+  --muted: #596575;
+  --line: rgba(24, 32, 43, 0.08);
+  --accent: #006d77;
+  --accent-strong: #004f56;
+  --accent-soft: #d7f2ef;
+  --danger: #c44536;
+  --success: #167a5a;
+  --shadow: 0 24px 70px rgba(24, 32, 43, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-body), sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(245, 183, 0, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 20%, rgba(0, 109, 119, 0.16), transparent 24%),
+    linear-gradient(160deg, #fdfbf5 0%, #f7f3eb 46%, #eef6f7 100%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.auth-page,
+.dashboard-page {
+  width: min(1200px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.auth-page {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 24px;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.hero-panel,
+.auth-card,
+.surface-card,
+.wallet-hero,
+.wallet-balance-card {
+  backdrop-filter: blur(16px);
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow);
+}
+
+.hero-panel {
+  border-radius: 32px;
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.eyebrow {
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 109, 119, 0.1);
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-panel h1,
+.auth-card h2,
+.wallet-hero h1 {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.hero-panel h1 {
+  font-size: clamp(3rem, 6vw, 5.2rem);
+  max-width: 10ch;
+}
+
+.hero-panel p,
+.auth-card p,
+.wallet-hero p,
+.section-heading span,
+.history-row p,
+.audit-row p,
+.profile-card p,
+.empty-copy {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.hero-card {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(24, 32, 43, 0.06);
+  display: grid;
+  gap: 8px;
+}
+
+.hero-card span,
+.section-heading span,
+.stat-card span,
+.wallet-balance-card span,
+.profile-grid span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero-card strong,
+.stat-card strong,
+.wallet-balance-card strong,
+.profile-grid strong {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.auth-card {
+  border-radius: 32px;
+  padding: 32px;
+  display: grid;
+  align-content: start;
+  gap: 24px;
+}
+
+.auth-card-header {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-card h2 {
+  font-size: 2.5rem;
+}
+
+.auth-form,
+.transfer-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form label,
+.transfer-form label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.auth-form input,
+.transfer-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+}
+
+.primary-button {
+  border: none;
+  border-radius: 18px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--accent) 0%, #0e878f 100%);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.auth-footer {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.seeded-panel {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(0, 109, 119, 0.08);
+  display: grid;
+  gap: 12px;
+}
+
+.seeded-panel ul,
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.seeded-panel li,
+.feature-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(24, 32, 43, 0.08);
+}
+
+.seeded-panel li:last-child,
+.feature-list li:last-child {
+  border-bottom: none;
+}
+
+.seeded-panel code {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.wallet-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.wallet-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 20px;
+  align-items: start;
+  padding: 20px 24px;
+  border-radius: 32px;
+}
+
+.wallet-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 152px;
+  padding: 4px 0;
+}
+
+.wallet-hero h1 {
+  margin: 10px 0 0;
+  font-size: clamp(2.8rem, 4vw, 4.4rem);
+}
+
+.wallet-balance-card {
+  border-radius: 28px;
+  min-height: 152px;
+  padding: 22px 24px;
+  background: linear-gradient(160deg, rgba(0, 109, 119, 0.95), rgba(14, 135, 143, 0.85));
+  color: white;
+  display: grid;
+  align-content: end;
+  gap: 12px;
+}
+
+.wallet-balance-card span,
+.wallet-balance-card small {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.wallet-balance-card strong {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.tab-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.tab,
+.logout-button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+
+.logout-button {
+  margin-left: auto;
+}
+
+.dashboard-grid,
+.transfer-layout,
+.profile-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.surface-card {
+  border-radius: 28px;
+  padding: 24px;
+}
+
+.stat-card {
+  min-height: 140px;
+  display: grid;
+  align-content: space-between;
+}
+
+.wide-card,
+.transfer-card,
+.profile-card {
+  grid-column: 1 / -1;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.section-heading h2,
+.profile-card h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-family: var(--font-display), sans-serif;
+}
+
+.list-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.history-row,
+.audit-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(24, 32, 43, 0.08);
+}
+
+.history-row:last-child,
+.audit-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.history-meta {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  text-align: right;
+}
+
+.positive {
+  color: var(--success);
+}
+
+.negative {
+  color: var(--danger);
+}
+
+.transfer-layout {
+  grid-template-columns: 1.1fr 0.9fr;
+}
+
+.recipient-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.recipient-chip {
+  border: 1px solid rgba(24, 32, 43, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 16px;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.recipient-chip span,
+.avatar-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.recipient-chip.active {
+  border-color: var(--accent);
+  background: rgba(0, 109, 119, 0.08);
+}
+
+.profile-layout {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.avatar-badge {
+  width: 64px;
+  height: 64px;
+  font-size: 1.1rem;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-grid div {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  gap: 10px;
+}
+
+.banner {
+  border-radius: 18px;
+  padding: 14px 16px;
+  font-weight: 600;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(24, 32, 43, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.transaction-modal {
+  width: min(440px, 100%);
+  padding: 28px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 70px rgba(24, 32, 43, 0.24);
+  display: grid;
+  gap: 16px;
+  text-align: center;
+}
+
+.transaction-modal h2 {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.8rem;
+}
+
+.transaction-modal p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.modal-badge {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.modal-badge.pending {
+  background: rgba(0, 109, 119, 0.12);
+  color: var(--accent-strong);
+}
+
+.modal-badge.success {
+  background: rgba(22, 122, 90, 0.14);
+  color: var(--success);
+}
+
+.modal-badge.error {
+  background: rgba(196, 69, 54, 0.14);
+  color: var(--danger);
+}
+
+.success-banner {
+  background: rgba(22, 122, 90, 0.12);
+  color: var(--success);
+}
+
+.error-banner {
+  background: rgba(196, 69, 54, 0.12);
+  color: var(--danger);
+}
+
+@media (max-width: 980px) {
+  .auth-page,
+  .wallet-hero,
+  .transfer-layout,
+  .profile-layout,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .logout-button {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-page,
+  .dashboard-page {
+    width: min(100vw - 20px, 1200px);
+    padding: 16px 0 28px;
+  }
+
+  .hero-panel,
+  .auth-card,
+  .wallet-hero,
+  .surface-card {
+    border-radius: 24px;
+    padding: 20px;
+  }
+
+  .hero-grid,
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tab,
+  .logout-button {
+    flex: 1 1 45%;
+    text-align: center;
+  }
+
+  .history-row,
+  .audit-row,
+  .seeded-panel li,
+  .feature-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-meta {
+    justify-items: start;
+    text-align: left;
+  }
+}

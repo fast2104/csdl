@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model AccountAuditLogs {
+  AuditId        Int            @id(map: "PK__AccountA__A17F23982E566A23") @default(autoincrement())
+  AccountId      Int
+  OldBalance     Decimal        @db.Decimal(18, 2)
+  NewBalance     Decimal        @db.Decimal(18, 2)
+  Delta          Decimal        @db.Decimal(18, 2)
+  ActionLabel    String         @default("BALANCE_UPDATED", map: "DF_AccountAuditLogs_ActionLabel") @db.NVarChar(50)
+  ActionDate     DateTime       @default(dbgenerated("sysdatetime()"), map: "DF_AccountAuditLogs_ActionDate")
+  WalletAccounts WalletAccounts @relation(fields: [AccountId], references: [AccountId], onUpdate: NoAction, map: "FK_AccountAuditLogs_Account")
+}
+
+model TransferTransactions {
+  TransferId                                                    Int         @id(map: "PK__Transfer__95490091CFA71338") @default(autoincrement())
+  SenderUserId                                                  Int
+  RecipientUserId                                               Int
+  Amount                                                        Decimal     @db.Decimal(18, 2)
+  Memo                                                          String?     @db.NVarChar(160)
+  CreatedAt                                                     DateTime    @default(dbgenerated("sysdatetime()"), map: "DF_TransferTransactions_CreatedAt")
+  WalletUsers_TransferTransactions_RecipientUserIdToWalletUsers WalletUsers @relation("TransferTransactions_RecipientUserIdToWalletUsers", fields: [RecipientUserId], references: [UserId], onUpdate: NoAction, map: "FK_TransferTransactions_Recipient")
+  WalletUsers_TransferTransactions_SenderUserIdToWalletUsers    WalletUsers @relation("TransferTransactions_SenderUserIdToWalletUsers", fields: [SenderUserId], references: [UserId], onUpdate: NoAction, map: "FK_TransferTransactions_Sender")
+}
+
+model WalletAccounts {
+  AccountId        Int                @id(map: "PK__WalletAc__349DA5A62610C5D3") @default(autoincrement())
+  UserId           Int                @unique(map: "UQ__WalletAc__1788CC4D330A6788")
+  Balance          Decimal            @db.Decimal(18, 2)
+  CurrencyCode     String             @default("USD", map: "DF_WalletAccounts_Currency") @db.Char(3)
+  CreatedAt        DateTime           @default(dbgenerated("sysdatetime()"), map: "DF_WalletAccounts_CreatedAt")
+  AccountAuditLogs AccountAuditLogs[]
+  WalletUsers      WalletUsers        @relation(fields: [UserId], references: [UserId], onUpdate: NoAction, map: "FK_WalletAccounts_User")
+}
+
+model WalletUsers {
+  UserId                                                                 Int                    @id(map: "PK__WalletUs__1788CC4CB5E63ECC") @default(autoincrement())
+  FullName                                                               String                 @db.NVarChar(120)
+  Email                                                                  String                 @unique(map: "UQ__WalletUs__A9D10534EA58CB7D") @db.NVarChar(255)
+  PasswordHash                                                           Bytes                  @db.VarBinary(32)
+  CreatedAt                                                              DateTime               @default(dbgenerated("sysdatetime()"), map: "DF_WalletUsers_CreatedAt")
+  TransferTransactions_TransferTransactions_RecipientUserIdToWalletUsers TransferTransactions[] @relation("TransferTransactions_RecipientUserIdToWalletUsers")
+  TransferTransactions_TransferTransactions_SenderUserIdToWalletUsers    TransferTransactions[] @relation("TransferTransactions_SenderUserIdToWalletUsers")
+  WalletAccounts                                                         WalletAccounts?
+}
