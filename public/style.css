@@ -1,6 +1,6 @@
 :root {
-    --navy-blue: #1A3673;
-    --navy-dark: #122550;
+    --navy-blue: #ffd263; /* Đổi màu vàng theo yêu cầu */
+    --navy-dark: #e5bc59;
     --bg-light: #F7F9FC;
     --white: #FFFFFF;
     --text-dark: #333333;
@@ -18,21 +18,29 @@
 }
 
 body {
-    background-color: #E5E5E5; /* Nền giả lập điện thoại */
+    background-color: #E5E5E5; 
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    margin: 0;
 }
 
 .app-container {
-    width: 375px;
-    height: 812px;
+    width: 100%;
+    max-width: 800px; /* Responsive up to 800px width */
+    height: 100vh;
     background-color: var(--bg-light);
-    border-radius: 40px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.1);
     overflow: hidden;
     position: relative;
+}
+
+@media (min-width: 800px) {
+    .app-container {
+        height: 90vh;
+        border-radius: 30px;
+    }
 }
 
 /* ================= VIEWS ================= */
@@ -62,7 +70,7 @@ body {
     padding: 15px 25px;
     font-size: 14px;
     font-weight: 500;
-    color: var(--white);
+    color: var(--text-dark); /* Sửa màu chữ để dễ đọc trên nền vàng */
     z-index: 10;
     position: relative;
 }
@@ -81,7 +89,7 @@ body {
     border-radius: 0 0 35px 35px;
     padding-bottom: 25px;
     position: relative;
-    color: var(--white);
+    color: var(--text-dark); /* Chữ đen để dễ đọc trên nền vàng */
 }
 
 .bell-icon {
@@ -140,7 +148,7 @@ body {
 }
 
 .view-all {
-    color: rgba(255,255,255,0.8);
+    color: rgba(0,0,0,0.6); /* Đổi màu chữ View All */
     text-decoration: none;
 }
 
@@ -182,8 +190,8 @@ body {
 
 /* Content Section (Home) */
 .content-section {
-    padding: 20px 25px;
-    height: calc(100% - 300px);
+    padding: 20px 25px 90px 25px; /* Thêm padding-bottom để không đè bottom nav */
+    height: calc(100% - 280px);
     overflow-y: auto;
 }
 
@@ -236,7 +244,7 @@ body {
     height: 40px;
     border-radius: 50%;
     background: var(--navy-blue);
-    color: white;
+    color: var(--text-dark); /* Icon màu đen trên nền vàng */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -296,8 +304,8 @@ body {
 }
 
 .transfer-content {
-    padding: 0 25px;
-    height: calc(100% - 150px);
+    padding: 0 25px 90px 25px; /* Thêm padding-bottom để không bị khuất */
+    height: calc(100% - 100px);
     overflow-y: auto;
 }
 
@@ -392,7 +400,7 @@ body {
 .main-action-btn {
     width: 100%;
     background: var(--navy-blue);
-    color: white;
+    color: var(--text-dark); /* Chữ đen trên nền vàng */
     border: none;
     padding: 16px;
     border-radius: 25px;

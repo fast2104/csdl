@@ -37,7 +37,10 @@ CREATE TABLE AuditLogs (
 GO
 
 -- 2. TẠO TRIGGER LƯU VẾT (AUDIT)
-CREATE OR ALTER TRIGGER trg_AuditAccountBalance
+IF OBJECT_ID('trg_AuditAccountBalance', 'TR') IS NOT NULL DROP TRIGGER trg_AuditAccountBalance;
+GO
+
+CREATE TRIGGER trg_AuditAccountBalance
 ON Accounts
 AFTER UPDATE
 AS
@@ -58,7 +61,10 @@ END;
 GO
 
 -- 3. TẠO STORED PROCEDURE VÀ TRANSACTION CHUYỂN TIỀN
-CREATE OR ALTER PROCEDURE sp_TransferMoney
+IF OBJECT_ID('sp_TransferMoney', 'P') IS NOT NULL DROP PROCEDURE sp_TransferMoney;
+GO
+
+CREATE PROCEDURE sp_TransferMoney
     @FromAccount INT,
     @ToAccount INT,
     @Amount DECIMAL(18,2)
