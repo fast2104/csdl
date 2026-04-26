@@ -19,6 +19,7 @@ function emptyDashboard(session) {
     contacts: [],
     history: [],
     audits: [],
+    requests: [],
   };
 }
 

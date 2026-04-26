@@ -29,6 +29,19 @@ model TransferTransactions {
   WalletUsers_TransferTransactions_SenderUserIdToWalletUsers    WalletUsers @relation("TransferTransactions_SenderUserIdToWalletUsers", fields: [SenderUserId], references: [UserId], onUpdate: NoAction, map: "FK_TransferTransactions_Sender")
 }
 
+model MoneyRequests {
+  RequestId       Int          @id @default(autoincrement())
+  RequesterUserId Int
+  PayerUserId     Int
+  Amount          Decimal      @db.Decimal(18, 2)
+  Memo            String?      @db.NVarChar(160)
+  Status          String       @default("pending") @db.NVarChar(20)
+  CreatedAt       DateTime     @default(dbgenerated("sysdatetime()"))
+  RespondedAt     DateTime?
+  Requester       WalletUsers  @relation("MoneyRequests_RequesterToWalletUsers", fields: [RequesterUserId], references: [UserId], onUpdate: NoAction)
+  Payer           WalletUsers  @relation("MoneyRequests_PayerToWalletUsers", fields: [PayerUserId], references: [UserId], onUpdate: NoAction)
+}
+
 model WalletAccounts {
   AccountId        Int                @id(map: "PK__WalletAc__349DA5A62610C5D3") @default(autoincrement())
   UserId           Int                @unique(map: "UQ__WalletAc__1788CC4D330A6788")
@@ -48,4 +61,6 @@ model WalletUsers {
   TransferTransactions_TransferTransactions_RecipientUserIdToWalletUsers TransferTransactions[] @relation("TransferTransactions_RecipientUserIdToWalletUsers")
   TransferTransactions_TransferTransactions_SenderUserIdToWalletUsers    TransferTransactions[] @relation("TransferTransactions_SenderUserIdToWalletUsers")
   WalletAccounts                                                         WalletAccounts?
+  MoneyRequests_Requester                                                MoneyRequests[]        @relation("MoneyRequests_RequesterToWalletUsers")
+  MoneyRequests_Payer                                                    MoneyRequests[]        @relation("MoneyRequests_PayerToWalletUsers")
 }

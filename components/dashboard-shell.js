@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 const tabs = [
   { id: "overview", label: "Overview" },
   { id: "transfer", label: "Transfer" },
+  { id: "requests", label: "Requests" },
   { id: "profile", label: "Profile" },
 ];
 
@@ -34,12 +35,18 @@ function initials(name = "") {
 
 export default function DashboardShell({ dbError, initialData, session }) {
   const router = useRouter();
+  const currentUserId = Number(session.userId);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedRecipient, setSelectedRecipient] = useState(
     initialData.contacts[0]?.userId ?? null,
   );
   const [transferAmount, setTransferAmount] = useState("125.00");
   const [transferMemo, setTransferMemo] = useState("Coffee split");
+  const [requestPayer, setRequestPayer] = useState(
+    initialData.contacts[0]?.userId ?? null,
+  );
+  const [requestAmount, setRequestAmount] = useState("50.00");
+  const [requestMemo, setRequestMemo] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -123,10 +130,10 @@ export default function DashboardShell({ dbError, initialData, session }) {
           "The transaction committed successfully and the balances were updated.",
       });
       refreshDashboard(data.result?.Message || "Transfer completed.");
-    } catch (requestError) {
+    } catch (fetchError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
+        fetchError instanceof Error
+          ? fetchError.message
           : "Could not reach the server.",
       );
       setTransactionModal({
@@ -134,8 +141,133 @@ export default function DashboardShell({ dbError, initialData, session }) {
         status: "error",
         title: "Connection problem",
         message:
-          requestError instanceof Error
-            ? requestError.message
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Could not reach the server.",
+      });
+    }
+  }
+
+  async function handleCreateRequest(event) {
+    event.preventDefault();
+    setError("");
+    setFeedback("");
+    setTransactionModal({
+      open: true,
+      status: "pending",
+      title: "Creating request",
+      message: "Calling sp_CreateMoneyRequest to store the payment request.",
+    });
+
+    try {
+      const response = await fetch("/api/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payerUserId: requestPayer,
+          amount: Number(requestAmount),
+          memo: requestMemo,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Request failed.");
+        setTransactionModal({
+          open: true,
+          status: "error",
+          title: "Request failed",
+          message: data.error || "Could not create the money request.",
+        });
+        return;
+      }
+
+      setRequestAmount("50.00");
+      setRequestMemo("");
+      setTransactionModal({
+        open: true,
+        status: "success",
+        title: "Request sent",
+        message: "Your money request has been sent successfully.",
+      });
+      refreshDashboard("Money request sent.");
+    } catch (fetchError) {
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Could not reach the server.",
+      );
+      setTransactionModal({
+        open: true,
+        status: "error",
+        title: "Connection problem",
+        message:
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Could not reach the server.",
+      });
+    }
+  }
+
+  async function handleRespondToRequest(requestId, accept) {
+    setError("");
+    setFeedback("");
+    setTransactionModal({
+      open: true,
+      status: "pending",
+      title: accept ? "Accepting request" : "Declining request",
+      message: accept
+        ? "Calling sp_RespondToMoneyRequest to execute the transfer."
+        : "Declining the money request.",
+    });
+
+    try {
+      const response = await fetch("/api/request/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, accept }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Response failed.");
+        setTransactionModal({
+          open: true,
+          status: "error",
+          title: "Response failed",
+          message: data.error || "Could not respond to the money request.",
+        });
+        return;
+      }
+
+      setTransactionModal({
+        open: true,
+        status: "success",
+        title: accept ? "Request accepted" : "Request declined",
+        message:
+          data.result?.Message ||
+          (accept
+            ? "Transfer completed successfully."
+            : "Request has been declined."),
+      });
+      refreshDashboard(
+        data.result?.Message || (accept ? "Request accepted." : "Request declined."),
+      );
+    } catch (fetchError) {
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Could not reach the server.",
+      );
+      setTransactionModal({
+        open: true,
+        status: "error",
+        title: "Connection problem",
+        message:
+          fetchError instanceof Error
+            ? fetchError.message
             : "Could not reach the server.",
       });
     }
@@ -354,6 +486,181 @@ export default function DashboardShell({ dbError, initialData, session }) {
                 {isPending ? "Refreshing..." : "Execute transfer"}
               </button>
             </form>
+          </article>
+        </section>
+      ) : null}
+
+      {activeTab === "requests" ? (
+        <section className="requests-layout">
+          <article className="surface-card transfer-card">
+            <div className="section-heading">
+              <h2>Request money</h2>
+              <span>Stored procedure: sp_CreateMoneyRequest</span>
+            </div>
+            <form className="transfer-form" onSubmit={handleCreateRequest}>
+              <label>
+                Request from
+                <div className="recipient-grid">
+                  {initialData.contacts.map((contact) => (
+                    <button
+                      className={
+                        contact.userId === requestPayer
+                          ? "recipient-chip active"
+                          : "recipient-chip"
+                      }
+                      key={contact.userId}
+                      onClick={() => setRequestPayer(contact.userId)}
+                      type="button"
+                    >
+                      <span>{initials(contact.fullName)}</span>
+                      <strong>{contact.fullName}</strong>
+                      <small>{contact.email}</small>
+                    </button>
+                  ))}
+                </div>
+              </label>
+
+              <label>
+                Amount
+                <input
+                  min="0.01"
+                  onChange={(event) => setRequestAmount(event.target.value)}
+                  required
+                  step="0.01"
+                  type="number"
+                  value={requestAmount}
+                />
+              </label>
+
+              <label>
+                Memo
+                <input
+                  maxLength={160}
+                  onChange={(event) => setRequestMemo(event.target.value)}
+                  placeholder="What is this request for?"
+                  type="text"
+                  value={requestMemo}
+                />
+              </label>
+
+              <button className="primary-button" disabled={isPending} type="submit">
+                {isPending ? "Refreshing..." : "Send request"}
+              </button>
+            </form>
+          </article>
+
+          <article className="surface-card wide-card">
+            <div className="section-heading">
+              <h2>Incoming requests</h2>
+              <span>
+                {initialData.requests.filter(
+                  (r) => r.payerUserId === currentUserId,
+                ).length}{" "}
+                requests
+              </span>
+            </div>
+            <div className="list-stack">
+              {initialData.requests.filter(
+                (r) => r.payerUserId === currentUserId,
+              ).length ? (
+                initialData.requests
+                  .filter((r) => r.payerUserId === currentUserId)
+                  .map((item) => (
+                    <div className="request-row" key={item.requestId}>
+                      <div>
+                        <strong>{item.requesterName}</strong>
+                        <p>
+                          {item.memo || "No memo"} •{" "}
+                          {item.status === "pending"
+                            ? "Awaiting your response"
+                            : item.status}
+                        </p>
+                      </div>
+                      <div className="request-actions">
+                        <strong>{formatMoney(item.amount)}</strong>
+                        {item.status === "pending" ? (
+                          <div className="request-buttons">
+                            <button
+                              className="primary-button"
+                              disabled={isPending}
+                              onClick={() =>
+                                handleRespondToRequest(item.requestId, true)
+                              }
+                              type="button"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              className="decline-button"
+                              disabled={isPending}
+                              onClick={() =>
+                                handleRespondToRequest(item.requestId, false)
+                              }
+                              type="button"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="request-status-label">
+                            {item.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <p className="empty-copy">
+                  No incoming requests. Other users can request money from you.
+                </p>
+              )}
+            </div>
+          </article>
+
+          <article className="surface-card wide-card">
+            <div className="section-heading">
+              <h2>Outgoing requests</h2>
+              <span>
+                {initialData.requests.filter(
+                  (r) => r.requesterUserId === currentUserId,
+                ).length}{" "}
+                requests
+              </span>
+            </div>
+            <div className="list-stack">
+              {initialData.requests.filter(
+                (r) => r.requesterUserId === currentUserId,
+              ).length ? (
+                initialData.requests
+                  .filter((r) => r.requesterUserId === currentUserId)
+                  .map((item) => (
+                    <div className="request-row" key={item.requestId}>
+                      <div>
+                        <strong>{item.payerName}</strong>
+                        <p>{item.memo || "No memo"}</p>
+                      </div>
+                      <div className="request-actions">
+                        <strong>{formatMoney(item.amount)}</strong>
+                        <span
+                          className={`request-status-label ${
+                            item.status === "accepted"
+                              ? "positive"
+                              : item.status === "declined"
+                                ? "negative"
+                                : ""
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <p className="empty-copy">
+                  No outgoing requests. Use the form above to request money.
+                </p>
+              )}
+            </div>
           </article>
         </section>
       ) : null}

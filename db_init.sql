@@ -1,6 +1,8 @@
 USE TransferDemoDB;
 GO
 
+IF OBJECT_ID('dbo.sp_RespondToMoneyRequest', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_RespondToMoneyRequest;
+IF OBJECT_ID('dbo.sp_CreateMoneyRequest', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_CreateMoneyRequest;
 IF OBJECT_ID('dbo.sp_TransferMoney', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_TransferMoney;
 IF OBJECT_ID('dbo.sp_GetWalletDashboard', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_GetWalletDashboard;
 IF OBJECT_ID('dbo.sp_LoginWalletUser', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_LoginWalletUser;
@@ -10,6 +12,7 @@ GO
 IF OBJECT_ID('dbo.trg_AuditWalletBalance', 'TR') IS NOT NULL DROP TRIGGER dbo.trg_AuditWalletBalance;
 GO
 
+IF OBJECT_ID('dbo.MoneyRequests', 'U') IS NOT NULL DROP TABLE dbo.MoneyRequests;
 IF OBJECT_ID('dbo.AccountAuditLogs', 'U') IS NOT NULL DROP TABLE dbo.AccountAuditLogs;
 IF OBJECT_ID('dbo.TransferTransactions', 'U') IS NOT NULL DROP TABLE dbo.TransferTransactions;
 IF OBJECT_ID('dbo.WalletAccounts', 'U') IS NOT NULL DROP TABLE dbo.WalletAccounts;
@@ -56,6 +59,22 @@ CREATE TABLE dbo.AccountAuditLogs (
     ActionLabel NVARCHAR(50) NOT NULL CONSTRAINT DF_AccountAuditLogs_ActionLabel DEFAULT 'BALANCE_UPDATED',
     ActionDate DATETIME2 NOT NULL CONSTRAINT DF_AccountAuditLogs_ActionDate DEFAULT SYSDATETIME(),
     CONSTRAINT FK_AccountAuditLogs_Account FOREIGN KEY (AccountId) REFERENCES dbo.WalletAccounts(AccountId)
+);
+GO
+
+CREATE TABLE dbo.MoneyRequests (
+    RequestId INT IDENTITY(1,1) PRIMARY KEY,
+    RequesterUserId INT NOT NULL,
+    PayerUserId INT NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL CONSTRAINT CK_MoneyRequests_Amount CHECK (Amount > 0),
+    Memo NVARCHAR(160) NULL,
+    Status NVARCHAR(20) NOT NULL CONSTRAINT DF_MoneyRequests_Status DEFAULT 'pending',
+    CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_MoneyRequests_CreatedAt DEFAULT SYSDATETIME(),
+    RespondedAt DATETIME2 NULL,
+    CONSTRAINT FK_MoneyRequests_Requester FOREIGN KEY (RequesterUserId) REFERENCES dbo.WalletUsers(UserId),
+    CONSTRAINT FK_MoneyRequests_Payer FOREIGN KEY (PayerUserId) REFERENCES dbo.WalletUsers(UserId),
+    CONSTRAINT CK_MoneyRequests_Status CHECK (Status IN ('pending', 'accepted', 'declined')),
+    CONSTRAINT CK_MoneyRequests_DifferentUsers CHECK (RequesterUserId <> PayerUserId)
 );
 GO
 
@@ -236,6 +255,28 @@ BEGIN
         ON accounts.AccountId = logs.AccountId
     WHERE accounts.UserId = @UserId
     ORDER BY logs.ActionDate DESC;
+
+    SELECT
+        r.RequestId,
+        r.RequesterUserId,
+        requester.FullName AS RequesterName,
+        requester.Email AS RequesterEmail,
+        r.PayerUserId,
+        payer.FullName AS PayerName,
+        payer.Email AS PayerEmail,
+        r.Amount,
+        r.Memo,
+        r.Status,
+        r.CreatedAt,
+        r.RespondedAt
+    FROM dbo.MoneyRequests r
+    INNER JOIN dbo.WalletUsers requester
+        ON requester.UserId = r.RequesterUserId
+    INNER JOIN dbo.WalletUsers payer
+        ON payer.UserId = r.PayerUserId
+    WHERE r.RequesterUserId = @UserId
+       OR r.PayerUserId = @UserId
+    ORDER BY r.CreatedAt DESC;
 END;
 GO
 
@@ -306,6 +347,172 @@ BEGIN
             @SenderName AS SenderName,
             @RecipientName AS RecipientName,
             @Amount AS Amount;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE PROCEDURE dbo.sp_CreateMoneyRequest
+    @RequesterUserId INT,
+    @PayerUserId INT,
+    @Amount DECIMAL(18,2),
+    @Memo NVARCHAR(160) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @RequesterUserId = @PayerUserId
+        THROW 54000, 'You cannot request money from yourself.', 1;
+
+    IF @Amount <= 0
+        THROW 54001, 'Request amount must be greater than zero.', 1;
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.WalletAccounts WHERE UserId = @RequesterUserId)
+        THROW 54002, 'The requester account does not exist.', 1;
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.WalletAccounts WHERE UserId = @PayerUserId)
+        THROW 54003, 'The payer account does not exist.', 1;
+
+    INSERT INTO dbo.MoneyRequests (RequesterUserId, PayerUserId, Amount, Memo)
+    VALUES (@RequesterUserId, @PayerUserId, @Amount, NULLIF(@Memo, ''));
+
+    DECLARE @RequestId INT = SCOPE_IDENTITY();
+
+    SELECT
+        r.RequestId,
+        r.RequesterUserId,
+        requester.FullName AS RequesterName,
+        r.PayerUserId,
+        payer.FullName AS PayerName,
+        r.Amount,
+        r.Memo,
+        r.Status,
+        r.CreatedAt
+    FROM dbo.MoneyRequests r
+    INNER JOIN dbo.WalletUsers requester
+        ON requester.UserId = r.RequesterUserId
+    INNER JOIN dbo.WalletUsers payer
+        ON payer.UserId = r.PayerUserId
+    WHERE r.RequestId = @RequestId;
+END;
+GO
+
+CREATE PROCEDURE dbo.sp_RespondToMoneyRequest
+    @RequestId INT,
+    @PayerUserId INT,
+    @Accept BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @RequesterUserId INT;
+    DECLARE @Amount DECIMAL(18,2);
+    DECLARE @Memo NVARCHAR(160);
+    DECLARE @CurrentStatus NVARCHAR(20);
+    DECLARE @ActualPayerUserId INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SELECT
+            @RequesterUserId = RequesterUserId,
+            @ActualPayerUserId = PayerUserId,
+            @Amount = Amount,
+            @Memo = Memo,
+            @CurrentStatus = Status
+        FROM dbo.MoneyRequests WITH (UPDLOCK, HOLDLOCK)
+        WHERE RequestId = @RequestId;
+
+        IF @RequesterUserId IS NULL
+            THROW 55000, 'The money request does not exist.', 1;
+
+        IF @ActualPayerUserId <> @PayerUserId
+            THROW 55001, 'You are not the payer for this request.', 1;
+
+        IF @CurrentStatus <> 'pending'
+            THROW 55002, 'This request has already been responded to.', 1;
+
+        IF @Accept = 1
+        BEGIN
+            DECLARE @SenderAccountId INT;
+            DECLARE @RecipientAccountId INT;
+            DECLARE @SenderBalance DECIMAL(18,2);
+            DECLARE @PayerName NVARCHAR(120);
+            DECLARE @RequesterName NVARCHAR(120);
+
+            SELECT
+                @SenderAccountId = a.AccountId,
+                @SenderBalance = a.Balance,
+                @PayerName = u.FullName
+            FROM dbo.WalletAccounts a WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.WalletUsers u
+                ON u.UserId = a.UserId
+            WHERE a.UserId = @PayerUserId;
+
+            SELECT
+                @RecipientAccountId = a.AccountId,
+                @RequesterName = u.FullName
+            FROM dbo.WalletAccounts a WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.WalletUsers u
+                ON u.UserId = a.UserId
+            WHERE a.UserId = @RequesterUserId;
+
+            IF @SenderAccountId IS NULL
+                THROW 55004, 'The payer account does not exist.', 1;
+
+            IF @RecipientAccountId IS NULL
+                THROW 55005, 'The requester account does not exist.', 1;
+
+            IF @SenderBalance < @Amount
+                THROW 55003, 'Insufficient balance to fulfill this request.', 1;
+
+            UPDATE dbo.WalletAccounts
+            SET Balance = Balance - @Amount
+            WHERE AccountId = @SenderAccountId;
+
+            UPDATE dbo.WalletAccounts
+            SET Balance = Balance + @Amount
+            WHERE AccountId = @RecipientAccountId;
+
+            DECLARE @TransferMemo NVARCHAR(160) = COALESCE(@Memo, 'Payment request #' + CAST(@RequestId AS NVARCHAR(10)));
+
+            INSERT INTO dbo.TransferTransactions (SenderUserId, RecipientUserId, Amount, Memo)
+            VALUES (@PayerUserId, @RequesterUserId, @Amount, @TransferMemo);
+
+            UPDATE dbo.MoneyRequests
+            SET Status = 'accepted', RespondedAt = SYSDATETIME()
+            WHERE RequestId = @RequestId
+              AND Status = 'pending';
+
+            IF @@ROWCOUNT = 0
+                THROW 55002, 'This request has already been responded to.', 1;
+
+            SELECT
+                'Request accepted and transfer completed.' AS Message,
+                @PayerName AS PayerName,
+                @RequesterName AS RequesterName,
+                @Amount AS Amount;
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.MoneyRequests
+            SET Status = 'declined', RespondedAt = SYSDATETIME()
+            WHERE RequestId = @RequestId
+              AND Status = 'pending';
+
+            IF @@ROWCOUNT = 0
+                THROW 55002, 'This request has already been responded to.', 1;
+
+            SELECT 'Request declined.' AS Message;
+        END
 
         COMMIT TRANSACTION;
     END TRY
