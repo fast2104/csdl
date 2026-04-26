@@ -465,6 +465,12 @@ BEGIN
                 ON u.UserId = a.UserId
             WHERE a.UserId = @RequesterUserId;
 
+            IF @SenderAccountId IS NULL
+                THROW 55004, 'The payer account does not exist.', 1;
+
+            IF @RecipientAccountId IS NULL
+                THROW 55005, 'The requester account does not exist.', 1;
+
             IF @SenderBalance < @Amount
                 THROW 55003, 'Insufficient balance to fulfill this request.', 1;
 
