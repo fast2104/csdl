@@ -35,6 +35,7 @@ function initials(name = "") {
 
 export default function DashboardShell({ dbError, initialData, session }) {
   const router = useRouter();
+  const currentUserId = Number(session.userId);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedRecipient, setSelectedRecipient] = useState(
     initialData.contacts[0]?.userId ?? null,
@@ -553,17 +554,17 @@ export default function DashboardShell({ dbError, initialData, session }) {
               <h2>Incoming requests</h2>
               <span>
                 {initialData.requests.filter(
-                  (r) => r.payerUserId === session.userId,
+                  (r) => r.payerUserId === currentUserId,
                 ).length}{" "}
                 requests
               </span>
             </div>
             <div className="list-stack">
               {initialData.requests.filter(
-                (r) => r.payerUserId === session.userId,
+                (r) => r.payerUserId === currentUserId,
               ).length ? (
                 initialData.requests
-                  .filter((r) => r.payerUserId === session.userId)
+                  .filter((r) => r.payerUserId === currentUserId)
                   .map((item) => (
                     <div className="request-row" key={item.requestId}>
                       <div>
@@ -621,17 +622,17 @@ export default function DashboardShell({ dbError, initialData, session }) {
               <h2>Outgoing requests</h2>
               <span>
                 {initialData.requests.filter(
-                  (r) => r.requesterUserId === session.userId,
+                  (r) => r.requesterUserId === currentUserId,
                 ).length}{" "}
                 requests
               </span>
             </div>
             <div className="list-stack">
               {initialData.requests.filter(
-                (r) => r.requesterUserId === session.userId,
+                (r) => r.requesterUserId === currentUserId,
               ).length ? (
                 initialData.requests
-                  .filter((r) => r.requesterUserId === session.userId)
+                  .filter((r) => r.requesterUserId === currentUserId)
                   .map((item) => (
                     <div className="request-row" key={item.requestId}>
                       <div>
