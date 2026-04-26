@@ -1,128 +1,340 @@
--- Tạo cơ sở dữ liệu nếu chưa có (Tuỳ chọn phần này tuỳ môi trường của bạn)
--- Nếu đã có DB, hãy đổi 'TransferDemoDB' thành tên DB của bạn
--- CREATE DATABASE TransferDemoDB;
--- GO
--- USE TransferDemoDB;
--- GO
+USE TransferDemoDB;
+GO
 
--- 1. TẠO CÁC BẢNG (TABLES)
-IF OBJECT_ID('Transactions', 'U') IS NOT NULL DROP TABLE Transactions;
-IF OBJECT_ID('AuditLogs', 'U') IS NOT NULL DROP TABLE AuditLogs;
-IF OBJECT_ID('Accounts', 'U') IS NOT NULL DROP TABLE Accounts;
+IF OBJECT_ID('dbo.sp_TransferMoney', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_TransferMoney;
+IF OBJECT_ID('dbo.sp_GetWalletDashboard', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_GetWalletDashboard;
+IF OBJECT_ID('dbo.sp_LoginWalletUser', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_LoginWalletUser;
+IF OBJECT_ID('dbo.sp_RegisterWalletUser', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_RegisterWalletUser;
+GO
 
-CREATE TABLE Accounts (
+IF OBJECT_ID('dbo.trg_AuditWalletBalance', 'TR') IS NOT NULL DROP TRIGGER dbo.trg_AuditWalletBalance;
+GO
+
+IF OBJECT_ID('dbo.AccountAuditLogs', 'U') IS NOT NULL DROP TABLE dbo.AccountAuditLogs;
+IF OBJECT_ID('dbo.TransferTransactions', 'U') IS NOT NULL DROP TABLE dbo.TransferTransactions;
+IF OBJECT_ID('dbo.WalletAccounts', 'U') IS NOT NULL DROP TABLE dbo.WalletAccounts;
+IF OBJECT_ID('dbo.WalletUsers', 'U') IS NOT NULL DROP TABLE dbo.WalletUsers;
+GO
+
+CREATE TABLE dbo.WalletUsers (
+    UserId INT IDENTITY(1,1) PRIMARY KEY,
+    FullName NVARCHAR(120) NOT NULL,
+    Email NVARCHAR(255) NOT NULL UNIQUE,
+    PasswordHash VARBINARY(32) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_WalletUsers_CreatedAt DEFAULT SYSDATETIME()
+);
+GO
+
+CREATE TABLE dbo.WalletAccounts (
     AccountId INT IDENTITY(1,1) PRIMARY KEY,
-    AccountName NVARCHAR(100) NOT NULL,
-    Balance DECIMAL(18,2) NOT NULL CHECK (Balance >= 0) -- Ràng buộc không cho số dư âm
-);
-
-CREATE TABLE Transactions (
-    TransactionId INT IDENTITY(1,1) PRIMARY KEY,
-    FromAccountId INT,
-    ToAccountId INT,
-    Amount DECIMAL(18,2) NOT NULL,
-    CreatedAt DATETIME DEFAULT GETDATE(),
-    FOREIGN KEY (FromAccountId) REFERENCES Accounts(AccountId),
-    FOREIGN KEY (ToAccountId) REFERENCES Accounts(AccountId)
-);
-
-CREATE TABLE AuditLogs (
-    LogId INT IDENTITY(1,1) PRIMARY KEY,
-    AccountId INT,
-    OldBalance DECIMAL(18,2),
-    NewBalance DECIMAL(18,2),
-    ActionDate DATETIME DEFAULT GETDATE(),
-    FOREIGN KEY (AccountId) REFERENCES Accounts(AccountId)
+    UserId INT NOT NULL UNIQUE,
+    Balance DECIMAL(18,2) NOT NULL CONSTRAINT CK_WalletAccounts_Balance CHECK (Balance >= 0),
+    CurrencyCode CHAR(3) NOT NULL CONSTRAINT DF_WalletAccounts_Currency DEFAULT 'USD',
+    CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_WalletAccounts_CreatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_WalletAccounts_User FOREIGN KEY (UserId) REFERENCES dbo.WalletUsers(UserId)
 );
 GO
 
--- 2. TẠO TRIGGER LƯU VẾT (AUDIT)
-IF OBJECT_ID('trg_AuditAccountBalance', 'TR') IS NOT NULL DROP TRIGGER trg_AuditAccountBalance;
+CREATE TABLE dbo.TransferTransactions (
+    TransferId INT IDENTITY(1,1) PRIMARY KEY,
+    SenderUserId INT NOT NULL,
+    RecipientUserId INT NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL CONSTRAINT CK_TransferTransactions_Amount CHECK (Amount > 0),
+    Memo NVARCHAR(160) NULL,
+    CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_TransferTransactions_CreatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_TransferTransactions_Sender FOREIGN KEY (SenderUserId) REFERENCES dbo.WalletUsers(UserId),
+    CONSTRAINT FK_TransferTransactions_Recipient FOREIGN KEY (RecipientUserId) REFERENCES dbo.WalletUsers(UserId)
+);
 GO
 
-CREATE TRIGGER trg_AuditAccountBalance
-ON Accounts
+CREATE TABLE dbo.AccountAuditLogs (
+    AuditId INT IDENTITY(1,1) PRIMARY KEY,
+    AccountId INT NOT NULL,
+    OldBalance DECIMAL(18,2) NOT NULL,
+    NewBalance DECIMAL(18,2) NOT NULL,
+    Delta DECIMAL(18,2) NOT NULL,
+    ActionLabel NVARCHAR(50) NOT NULL CONSTRAINT DF_AccountAuditLogs_ActionLabel DEFAULT 'BALANCE_UPDATED',
+    ActionDate DATETIME2 NOT NULL CONSTRAINT DF_AccountAuditLogs_ActionDate DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_AccountAuditLogs_Account FOREIGN KEY (AccountId) REFERENCES dbo.WalletAccounts(AccountId)
+);
+GO
+
+CREATE TRIGGER dbo.trg_AuditWalletBalance
+ON dbo.WalletAccounts
 AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Thêm log vào bảng AuditLogs khi có thay đổi số dư
-    INSERT INTO AuditLogs (AccountId, OldBalance, NewBalance, ActionDate)
-    SELECT 
-        i.AccountId,
-        d.Balance,
-        i.Balance,
-        GETDATE()
-    FROM inserted i
-    JOIN deleted d ON i.AccountId = d.AccountId
-    WHERE i.Balance <> d.Balance; -- Chỉ log khi số dư thực sự thay đổi
+    INSERT INTO dbo.AccountAuditLogs (AccountId, OldBalance, NewBalance, Delta, ActionLabel, ActionDate)
+    SELECT
+        inserted.AccountId,
+        deleted.Balance,
+        inserted.Balance,
+        inserted.Balance - deleted.Balance,
+        'BALANCE_UPDATED',
+        SYSDATETIME()
+    FROM inserted
+    INNER JOIN deleted
+        ON inserted.AccountId = deleted.AccountId
+    WHERE inserted.Balance <> deleted.Balance;
 END;
 GO
 
--- 3. TẠO STORED PROCEDURE VÀ TRANSACTION CHUYỂN TIỀN
-IF OBJECT_ID('sp_TransferMoney', 'P') IS NOT NULL DROP PROCEDURE sp_TransferMoney;
-GO
-
-CREATE PROCEDURE sp_TransferMoney
-    @FromAccount INT,
-    @ToAccount INT,
-    @Amount DECIMAL(18,2)
+CREATE PROCEDURE dbo.sp_RegisterWalletUser
+    @FullName NVARCHAR(120),
+    @Email NVARCHAR(255),
+    @Password NVARCHAR(128),
+    @OpeningBalance DECIMAL(18,2) = 1000.00
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-    -- Nếu From và To giống nhau thì ném lỗi
-    IF @FromAccount = @ToAccount
-    BEGIN
-        THROW 51001, 'Không thể chuyển tiền cho chính mình.', 1;
-        RETURN;
-    END
+    SET XACT_ABORT ON;
+
+    DECLARE @NormalizedEmail NVARCHAR(255) = LOWER(LTRIM(RTRIM(@Email)));
+
+    IF NULLIF(LTRIM(RTRIM(@FullName)), '') IS NULL
+        THROW 52000, 'Full name is required.', 1;
+
+    IF NULLIF(@NormalizedEmail, '') IS NULL
+        THROW 52001, 'Email is required.', 1;
+
+    IF NULLIF(@Password, '') IS NULL
+        THROW 52002, 'Password is required.', 1;
+
+    IF @OpeningBalance < 0
+        THROW 52003, 'Opening balance cannot be negative.', 1;
+
+    IF EXISTS (SELECT 1 FROM dbo.WalletUsers WHERE Email = @NormalizedEmail)
+        THROW 52004, 'An account with that email already exists.', 1;
 
     BEGIN TRY
-        -- Bắt đầu Transaction
         BEGIN TRANSACTION;
 
-        -- Kiểm tra số dư người gửi
-        DECLARE @CurrentBalance DECIMAL(18,2);
-        SELECT @CurrentBalance = Balance FROM Accounts WHERE AccountId = @FromAccount;
-        
-        IF @CurrentBalance IS NULL
-        BEGIN
-            THROW 51002, 'Tài khoản gửi không tồn tại.', 1;
-        END
+        INSERT INTO dbo.WalletUsers (FullName, Email, PasswordHash)
+        VALUES (@FullName, @NormalizedEmail, HASHBYTES('SHA2_256', @Password));
 
-        IF @CurrentBalance < @Amount
-        BEGIN
-            THROW 51000, 'Số dư không đủ để thực hiện giao dịch.', 1;
-        END
+        DECLARE @UserId INT = SCOPE_IDENTITY();
 
-        -- Trừ tiền người gửi
-        UPDATE Accounts SET Balance = Balance - @Amount WHERE AccountId = @FromAccount;
-        
-        -- Cộng tiền người nhận
-        UPDATE Accounts SET Balance = Balance + @Amount WHERE AccountId = @ToAccount;
+        INSERT INTO dbo.WalletAccounts (UserId, Balance)
+        VALUES (@UserId, @OpeningBalance);
 
-        -- Ghi log giao dịch
-        INSERT INTO Transactions (FromAccountId, ToAccountId, Amount)
-        VALUES (@FromAccount, @ToAccount, @Amount);
+        SELECT
+            u.UserId,
+            u.FullName,
+            u.Email,
+            a.AccountId,
+            a.Balance,
+            a.CurrencyCode,
+            u.CreatedAt
+        FROM dbo.WalletUsers u
+        INNER JOIN dbo.WalletAccounts a
+            ON a.UserId = u.UserId
+        WHERE u.UserId = @UserId;
 
-        -- Xác nhận Transaction thành công
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
-        -- Hủy bỏ Transaction nếu xảy ra bất kỳ lỗi gì
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
-            
-        -- Báo lỗi ra cho ứng dụng (Node.js)
+
         THROW;
     END CATCH
 END;
 GO
 
--- 4. KHỞI TẠO DỮ LIỆU MẪU
-INSERT INTO Accounts (AccountName, Balance) VALUES ('Alice', 1000.00);
-INSERT INTO Accounts (AccountName, Balance) VALUES ('Bob', 500.00);
-INSERT INTO Accounts (AccountName, Balance) VALUES ('Charlie', 200.00);
+CREATE PROCEDURE dbo.sp_LoginWalletUser
+    @Email NVARCHAR(255),
+    @Password NVARCHAR(128)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @NormalizedEmail NVARCHAR(255) = LOWER(LTRIM(RTRIM(@Email)));
+
+    SELECT
+        u.UserId,
+        u.FullName,
+        u.Email,
+        a.AccountId,
+        a.Balance,
+        a.CurrencyCode,
+        u.CreatedAt
+    FROM dbo.WalletUsers u
+    INNER JOIN dbo.WalletAccounts a
+        ON a.UserId = u.UserId
+    WHERE u.Email = @NormalizedEmail
+      AND u.PasswordHash = HASHBYTES('SHA2_256', @Password);
+END;
+GO
+
+CREATE PROCEDURE dbo.sp_GetWalletDashboard
+    @UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        u.UserId,
+        u.FullName,
+        u.Email,
+        a.AccountId,
+        a.Balance,
+        a.CurrencyCode,
+        u.CreatedAt
+    FROM dbo.WalletUsers u
+    INNER JOIN dbo.WalletAccounts a
+        ON a.UserId = u.UserId
+    WHERE u.UserId = @UserId;
+
+    SELECT
+        u.UserId,
+        u.FullName,
+        u.Email,
+        a.Balance
+    FROM dbo.WalletUsers u
+    INNER JOIN dbo.WalletAccounts a
+        ON a.UserId = u.UserId
+    WHERE u.UserId <> @UserId
+    ORDER BY u.FullName;
+
+    SELECT TOP (10)
+        t.TransferId,
+        CASE
+            WHEN t.SenderUserId = @UserId THEN 'Sent'
+            ELSE 'Received'
+        END AS DirectionLabel,
+        CASE
+            WHEN t.SenderUserId = @UserId THEN recipient.FullName
+            ELSE sender.FullName
+        END AS CounterpartyName,
+        CASE
+            WHEN t.SenderUserId = @UserId THEN recipient.Email
+            ELSE sender.Email
+        END AS CounterpartyEmail,
+        t.Amount,
+        t.Memo,
+        t.CreatedAt
+    FROM dbo.TransferTransactions t
+    INNER JOIN dbo.WalletUsers sender
+        ON sender.UserId = t.SenderUserId
+    INNER JOIN dbo.WalletUsers recipient
+        ON recipient.UserId = t.RecipientUserId
+    WHERE t.SenderUserId = @UserId
+       OR t.RecipientUserId = @UserId
+    ORDER BY t.CreatedAt DESC;
+
+    SELECT TOP (10)
+        logs.AuditId,
+        logs.OldBalance,
+        logs.NewBalance,
+        logs.Delta,
+        logs.ActionLabel,
+        logs.ActionDate
+    FROM dbo.AccountAuditLogs logs
+    INNER JOIN dbo.WalletAccounts accounts
+        ON accounts.AccountId = logs.AccountId
+    WHERE accounts.UserId = @UserId
+    ORDER BY logs.ActionDate DESC;
+END;
+GO
+
+CREATE PROCEDURE dbo.sp_TransferMoney
+    @SenderUserId INT,
+    @RecipientUserId INT,
+    @Amount DECIMAL(18,2),
+    @Memo NVARCHAR(160) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @SenderUserId = @RecipientUserId
+        THROW 53000, 'You cannot transfer money to the same account.', 1;
+
+    IF @Amount <= 0
+        THROW 53001, 'Transfer amount must be greater than zero.', 1;
+
+    DECLARE @SenderAccountId INT;
+    DECLARE @RecipientAccountId INT;
+    DECLARE @SenderBalance DECIMAL(18,2);
+    DECLARE @SenderName NVARCHAR(120);
+    DECLARE @RecipientName NVARCHAR(120);
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SELECT
+            @SenderAccountId = a.AccountId,
+            @SenderBalance = a.Balance,
+            @SenderName = u.FullName
+        FROM dbo.WalletAccounts a WITH (UPDLOCK, HOLDLOCK)
+        INNER JOIN dbo.WalletUsers u
+            ON u.UserId = a.UserId
+        WHERE a.UserId = @SenderUserId;
+
+        SELECT
+            @RecipientAccountId = a.AccountId,
+            @RecipientName = u.FullName
+        FROM dbo.WalletAccounts a WITH (UPDLOCK, HOLDLOCK)
+        INNER JOIN dbo.WalletUsers u
+            ON u.UserId = a.UserId
+        WHERE a.UserId = @RecipientUserId;
+
+        IF @SenderAccountId IS NULL
+            THROW 53002, 'The sender account does not exist.', 1;
+
+        IF @RecipientAccountId IS NULL
+            THROW 53003, 'The recipient account does not exist.', 1;
+
+        IF @SenderBalance < @Amount
+            THROW 53004, 'Insufficient balance for this transfer.', 1;
+
+        UPDATE dbo.WalletAccounts
+        SET Balance = Balance - @Amount
+        WHERE AccountId = @SenderAccountId;
+
+        UPDATE dbo.WalletAccounts
+        SET Balance = Balance + @Amount
+        WHERE AccountId = @RecipientAccountId;
+
+        INSERT INTO dbo.TransferTransactions (SenderUserId, RecipientUserId, Amount, Memo)
+        VALUES (@SenderUserId, @RecipientUserId, @Amount, NULLIF(@Memo, ''));
+
+        SELECT
+            'Transfer completed successfully.' AS Message,
+            @SenderName AS SenderName,
+            @RecipientName AS RecipientName,
+            @Amount AS Amount;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
+END;
+GO
+
+EXEC dbo.sp_RegisterWalletUser
+    @FullName = 'Alice Tran',
+    @Email = 'alice@wallet.demo',
+    @Password = 'demo123',
+    @OpeningBalance = 2200.00;
+GO
+
+EXEC dbo.sp_RegisterWalletUser
+    @FullName = 'Bob Nguyen',
+    @Email = 'bob@wallet.demo',
+    @Password = 'demo123',
+    @OpeningBalance = 1450.00;
+GO
+
+EXEC dbo.sp_RegisterWalletUser
+    @FullName = 'Charlie Pham',
+    @Email = 'charlie@wallet.demo',
+    @Password = 'demo123',
+    @OpeningBalance = 860.00;
 GO
