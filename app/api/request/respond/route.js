@@ -14,7 +14,13 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const requestId = Number(body?.requestId);
-    const accept = Boolean(body?.accept);
+    if (typeof body?.accept !== "boolean") {
+      return NextResponse.json(
+        { error: "'accept' must be true or false." },
+        { status: 400 },
+      );
+    }
+    const accept = body.accept;
 
     if (!Number.isInteger(requestId) || requestId <= 0) {
       return NextResponse.json(
