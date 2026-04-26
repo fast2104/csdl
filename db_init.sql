@@ -419,34 +419,34 @@ BEGIN
     DECLARE @CurrentStatus NVARCHAR(20);
     DECLARE @ActualPayerUserId INT;
 
-    SELECT
-        @RequesterUserId = RequesterUserId,
-        @ActualPayerUserId = PayerUserId,
-        @Amount = Amount,
-        @Memo = Memo,
-        @CurrentStatus = Status
-    FROM dbo.MoneyRequests
-    WHERE RequestId = @RequestId;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-    IF @RequesterUserId IS NULL
-        THROW 55000, 'The money request does not exist.', 1;
+        SELECT
+            @RequesterUserId = RequesterUserId,
+            @ActualPayerUserId = PayerUserId,
+            @Amount = Amount,
+            @Memo = Memo,
+            @CurrentStatus = Status
+        FROM dbo.MoneyRequests WITH (UPDLOCK, HOLDLOCK)
+        WHERE RequestId = @RequestId;
 
-    IF @ActualPayerUserId <> @PayerUserId
-        THROW 55001, 'You are not the payer for this request.', 1;
+        IF @RequesterUserId IS NULL
+            THROW 55000, 'The money request does not exist.', 1;
 
-    IF @CurrentStatus <> 'pending'
-        THROW 55002, 'This request has already been responded to.', 1;
+        IF @ActualPayerUserId <> @PayerUserId
+            THROW 55001, 'You are not the payer for this request.', 1;
 
-    IF @Accept = 1
-    BEGIN
-        DECLARE @SenderAccountId INT;
-        DECLARE @RecipientAccountId INT;
-        DECLARE @SenderBalance DECIMAL(18,2);
-        DECLARE @PayerName NVARCHAR(120);
-        DECLARE @RequesterName NVARCHAR(120);
+        IF @CurrentStatus <> 'pending'
+            THROW 55002, 'This request has already been responded to.', 1;
 
-        BEGIN TRY
-            BEGIN TRANSACTION;
+        IF @Accept = 1
+        BEGIN
+            DECLARE @SenderAccountId INT;
+            DECLARE @RecipientAccountId INT;
+            DECLARE @SenderBalance DECIMAL(18,2);
+            DECLARE @PayerName NVARCHAR(120);
+            DECLARE @RequesterName NVARCHAR(120);
 
             SELECT
                 @SenderAccountId = a.AccountId,
@@ -483,31 +483,39 @@ BEGIN
 
             UPDATE dbo.MoneyRequests
             SET Status = 'accepted', RespondedAt = SYSDATETIME()
-            WHERE RequestId = @RequestId;
+            WHERE RequestId = @RequestId
+              AND Status = 'pending';
+
+            IF @@ROWCOUNT = 0
+                THROW 55002, 'This request has already been responded to.', 1;
 
             SELECT
                 'Request accepted and transfer completed.' AS Message,
                 @PayerName AS PayerName,
                 @RequesterName AS RequesterName,
                 @Amount AS Amount;
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.MoneyRequests
+            SET Status = 'declined', RespondedAt = SYSDATETIME()
+            WHERE RequestId = @RequestId
+              AND Status = 'pending';
 
-            COMMIT TRANSACTION;
-        END TRY
-        BEGIN CATCH
-            IF @@TRANCOUNT > 0
-                ROLLBACK TRANSACTION;
+            IF @@ROWCOUNT = 0
+                THROW 55002, 'This request has already been responded to.', 1;
 
-            THROW;
-        END CATCH
-    END
-    ELSE
-    BEGIN
-        UPDATE dbo.MoneyRequests
-        SET Status = 'declined', RespondedAt = SYSDATETIME()
-        WHERE RequestId = @RequestId;
+            SELECT 'Request declined.' AS Message;
+        END
 
-        SELECT 'Request declined.' AS Message;
-    END
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
 END;
 GO
 
