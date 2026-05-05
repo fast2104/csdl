@@ -261,6 +261,8 @@ export default function DashboardShell({ dbError, initialData, session }) {
     message: "",
   });
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -335,7 +337,7 @@ export default function DashboardShell({ dbError, initialData, session }) {
         })
         .catch(() => {});
     }
-  }, [activeTab]);
+  }, [activeTab, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "statistics") {
@@ -348,7 +350,7 @@ export default function DashboardShell({ dbError, initialData, session }) {
         })
         .catch(() => {});
     }
-  }, [activeTab, statsPeriod]);
+  }, [activeTab, statsPeriod, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "budgets") {
@@ -359,7 +361,7 @@ export default function DashboardShell({ dbError, initialData, session }) {
         })
         .catch(() => {});
     }
-  }, [activeTab, budgetMonth, budgetYear]);
+  }, [activeTab, budgetMonth, budgetYear, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "transfer") {
@@ -370,7 +372,7 @@ export default function DashboardShell({ dbError, initialData, session }) {
         })
         .catch(() => {});
     }
-  }, [activeTab]);
+  }, [activeTab, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "requests") {
@@ -381,10 +383,12 @@ export default function DashboardShell({ dbError, initialData, session }) {
         })
         .catch(() => {});
     }
-  }, [activeTab]);
+  }, [activeTab, refreshKey]);
 
   function refreshDashboard(successMessage) {
     setFeedback(successMessage || "");
+    setRefreshKey((k) => k + 1);
+    fetchNotifications();
     startTransition(() => {
       router.refresh();
     });
