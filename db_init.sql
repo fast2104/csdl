@@ -522,21 +522,21 @@ BEGIN
         IF @CurrentStatus <> 'pending'
             THROW 55002, 'This request has already been responded to.', 1;
 
+        DECLARE @PayerName NVARCHAR(120);
+        SELECT @PayerName = u.FullName
+        FROM dbo.WalletUsers u WHERE u.UserId = @PayerUserId;
+
         IF @Accept = 1
         BEGIN
             DECLARE @SenderAccountId INT;
             DECLARE @RecipientAccountId INT;
             DECLARE @SenderBalance DECIMAL(18,2);
-            DECLARE @PayerName NVARCHAR(120);
             DECLARE @RequesterName NVARCHAR(120);
 
             SELECT
                 @SenderAccountId = a.AccountId,
-                @SenderBalance = a.Balance,
-                @PayerName = u.FullName
+                @SenderBalance = a.Balance
             FROM dbo.WalletAccounts a WITH (UPDLOCK, HOLDLOCK)
-            INNER JOIN dbo.WalletUsers u
-                ON u.UserId = a.UserId
             WHERE a.UserId = @PayerUserId;
 
             SELECT

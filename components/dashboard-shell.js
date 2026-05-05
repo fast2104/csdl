@@ -732,7 +732,7 @@ export default function DashboardShell({ dbError, initialData, session }) {
           description: splitDescription,
           totalAmount: Number(splitAmount),
           splitMethod: "equal",
-          participantUserIds: splitParticipants,
+          participantUserIds: [currentUserId, ...splitParticipants],
         }),
       });
       const data = await response.json();
