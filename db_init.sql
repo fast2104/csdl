@@ -586,6 +586,22 @@ BEGIN
                  @PayerName + ' paid ' + FORMAT(@Amount, 'C', 'en-US') + ' for your money request.',
                  @RequestId);
 
+            UPDATE dbo.SplitBillParticipants
+            SET Status = 'paid'
+            WHERE RequestId = @RequestId;
+
+            DECLARE @SplitBillId INT;
+            SELECT @SplitBillId = SplitBillId FROM dbo.SplitBillParticipants WHERE RequestId = @RequestId;
+
+            IF @SplitBillId IS NOT NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM dbo.SplitBillParticipants
+                    WHERE SplitBillId = @SplitBillId AND Status <> 'paid'
+                )
+            BEGIN
+                UPDATE dbo.SplitBills SET Status = 'settled' WHERE SplitBillId = @SplitBillId;
+            END
+
             SELECT
                 'Request accepted and transfer completed.' AS Message,
                 @PayerName AS PayerName,
@@ -608,6 +624,10 @@ BEGIN
                  @PayerName + ' declined your request',
                  @PayerName + ' declined your ' + FORMAT(@Amount, 'C', 'en-US') + ' money request.',
                  @RequestId);
+
+            UPDATE dbo.SplitBillParticipants
+            SET Status = 'declined'
+            WHERE RequestId = @RequestId;
 
             SELECT 'Request declined.' AS Message;
         END
@@ -1056,6 +1076,15 @@ BEGIN
     BEGIN
         BEGIN TRY
             BEGIN TRANSACTION;
+
+            DECLARE @StillActive BIT;
+            SELECT @StillActive = IsActive FROM dbo.RecurringTransfers WITH (UPDLOCK) WHERE RecurringId = @RecurringId;
+            IF @StillActive = 0
+            BEGIN
+                COMMIT TRANSACTION;
+                FETCH NEXT FROM cur INTO @RecurringId, @SenderUserId, @RecipientUserId, @Amount, @Memo, @Tag, @Frequency;
+                CONTINUE;
+            END
 
             DECLARE @SenderAccountId INT, @SenderBalance DECIMAL(18,2);
             DECLARE @RecipientAccountId INT;
