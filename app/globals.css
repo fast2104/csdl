@@ -757,7 +757,7 @@ input {
 }
 
 .notification-item:not(.read) {
-  background: rgba(0, 109, 119, 0.04);
+  background: var(--panel);
 }
 
 .notification-item strong {
@@ -852,7 +852,6 @@ input {
 
 .balance-chart-svg {
   width: 100%;
-  max-width: 600px;
   height: auto;
 }
 

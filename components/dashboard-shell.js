@@ -1034,6 +1034,18 @@ export default function DashboardShell({ dbError, initialData, session }) {
 
               <article className="surface-card wide-card">
                 <div className="section-heading">
+                  <h2>Receiving by tag</h2>
+                  <span>{expenseStats.receivedByTag?.length || 0} tags</span>
+                </div>
+                {expenseStats.receivedByTag?.length ? (
+                  <PieChart data={expenseStats.receivedByTag} />
+                ) : (
+                  <p className="empty-copy">No incoming transfers in this period.</p>
+                )}
+              </article>
+
+              <article className="surface-card wide-card">
+                <div className="section-heading">
                   <h2>Top recipients</h2>
                   <span>{expenseStats.byCounterparty.length} contacts</span>
                 </div>

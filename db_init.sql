@@ -413,16 +413,18 @@ BEGIN
         INSERT INTO dbo.TransferTransactions (SenderUserId, RecipientUserId, Amount, Memo, Tag)
         VALUES (@SenderUserId, @RecipientUserId, @Amount, NULLIF(@Memo, ''), NULLIF(@Tag, ''));
 
+        DECLARE @TransferId INT = SCOPE_IDENTITY();
+
         INSERT INTO dbo.Notifications (UserId, Type, Title, Body, ReferenceId)
         VALUES
             (@RecipientUserId, 'transfer_received',
              'Money received from ' + @SenderName,
              'You received ' + FORMAT(@Amount, 'C', 'en-US') + ' from ' + @SenderName + '.',
-             SCOPE_IDENTITY()),
+             @TransferId),
             (@SenderUserId, 'transfer_sent',
              'Transfer sent to ' + @RecipientName,
              'You sent ' + FORMAT(@Amount, 'C', 'en-US') + ' to ' + @RecipientName + '.',
-             SCOPE_IDENTITY());
+             @TransferId);
 
         SELECT
             'Transfer completed successfully.' AS Message,
@@ -685,7 +687,7 @@ BEGIN
     GROUP BY t.Tag
     ORDER BY Total DESC;
 
-    -- Record set 3: By Counterparty
+    -- Record set 3: By Counterparty (outgoing)
     SELECT
         u.UserId AS CounterpartyUserId,
         u.FullName AS CounterpartyName,
@@ -698,6 +700,18 @@ BEGIN
       AND (@ToDate IS NULL OR t.CreatedAt <= @ToDate)
     GROUP BY u.UserId, u.FullName
     ORDER BY TotalSent DESC;
+
+    -- Record set 4: By Tag (incoming only)
+    SELECT
+        ISNULL(t.Tag, 'Uncategorized') AS Tag,
+        SUM(t.Amount) AS Total,
+        COUNT(*) AS TransactionCount
+    FROM dbo.TransferTransactions t
+    WHERE t.RecipientUserId = @UserId
+      AND (@FromDate IS NULL OR t.CreatedAt >= @FromDate)
+      AND (@ToDate IS NULL OR t.CreatedAt <= @ToDate)
+    GROUP BY t.Tag
+    ORDER BY Total DESC;
 END;
 GO
 
