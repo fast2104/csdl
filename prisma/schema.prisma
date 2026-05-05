@@ -8,7 +8,7 @@ datasource db {
 }
 
 model AccountAuditLogs {
-  AuditId        Int            @id(map: "PK__AccountA__A17F23982E566A23") @default(autoincrement())
+  AuditId        Int            @id(map: "PK__AccountA__A17F2398F7A4DC87") @default(autoincrement())
   AccountId      Int
   OldBalance     Decimal        @db.Decimal(18, 2)
   NewBalance     Decimal        @db.Decimal(18, 2)
@@ -19,32 +19,34 @@ model AccountAuditLogs {
 }
 
 model TransferTransactions {
-  TransferId                                                    Int         @id(map: "PK__Transfer__95490091CFA71338") @default(autoincrement())
+  TransferId                                                    Int         @id(map: "PK__Transfer__954900914F053B97") @default(autoincrement())
   SenderUserId                                                  Int
   RecipientUserId                                               Int
   Amount                                                        Decimal     @db.Decimal(18, 2)
   Memo                                                          String?     @db.NVarChar(160)
+  Tag                                                           String?     @db.NVarChar(40)
   CreatedAt                                                     DateTime    @default(dbgenerated("sysdatetime()"), map: "DF_TransferTransactions_CreatedAt")
   WalletUsers_TransferTransactions_RecipientUserIdToWalletUsers WalletUsers @relation("TransferTransactions_RecipientUserIdToWalletUsers", fields: [RecipientUserId], references: [UserId], onUpdate: NoAction, map: "FK_TransferTransactions_Recipient")
   WalletUsers_TransferTransactions_SenderUserIdToWalletUsers    WalletUsers @relation("TransferTransactions_SenderUserIdToWalletUsers", fields: [SenderUserId], references: [UserId], onUpdate: NoAction, map: "FK_TransferTransactions_Sender")
 }
 
 model MoneyRequests {
-  RequestId       Int          @id @default(autoincrement())
-  RequesterUserId Int
-  PayerUserId     Int
-  Amount          Decimal      @db.Decimal(18, 2)
-  Memo            String?      @db.NVarChar(160)
-  Status          String       @default("pending") @db.NVarChar(20)
-  CreatedAt       DateTime     @default(dbgenerated("sysdatetime()"))
-  RespondedAt     DateTime?
-  Requester       WalletUsers  @relation("MoneyRequests_RequesterToWalletUsers", fields: [RequesterUserId], references: [UserId], onUpdate: NoAction)
-  Payer           WalletUsers  @relation("MoneyRequests_PayerToWalletUsers", fields: [PayerUserId], references: [UserId], onUpdate: NoAction)
+  RequestId             Int                     @id(map: "PK__MoneyReq__33A8517A5B712655") @default(autoincrement())
+  RequesterUserId       Int
+  PayerUserId           Int
+  Amount                Decimal                 @db.Decimal(18, 2)
+  Memo                  String?                 @db.NVarChar(160)
+  Status                String                  @default("pending", map: "DF_MoneyRequests_Status") @db.NVarChar(20)
+  CreatedAt             DateTime                @default(dbgenerated("sysdatetime()"), map: "DF_MoneyRequests_CreatedAt")
+  RespondedAt           DateTime?
+  Payer                 WalletUsers             @relation("MoneyRequests_PayerToWalletUsers", fields: [PayerUserId], references: [UserId], onUpdate: NoAction, map: "FK_MoneyRequests_Payer")
+  Requester             WalletUsers             @relation("MoneyRequests_RequesterToWalletUsers", fields: [RequesterUserId], references: [UserId], onUpdate: NoAction, map: "FK_MoneyRequests_Requester")
+  SplitBillParticipants SplitBillParticipants[]
 }
 
 model WalletAccounts {
-  AccountId        Int                @id(map: "PK__WalletAc__349DA5A62610C5D3") @default(autoincrement())
-  UserId           Int                @unique(map: "UQ__WalletAc__1788CC4D330A6788")
+  AccountId        Int                @id(map: "PK__WalletAc__349DA5A628DFFD26") @default(autoincrement())
+  UserId           Int                @unique(map: "UQ__WalletAc__1788CC4D6002AC1A")
   Balance          Decimal            @db.Decimal(18, 2)
   CurrencyCode     String             @default("USD", map: "DF_WalletAccounts_Currency") @db.Char(3)
   CreatedAt        DateTime           @default(dbgenerated("sysdatetime()"), map: "DF_WalletAccounts_CreatedAt")
@@ -53,14 +55,114 @@ model WalletAccounts {
 }
 
 model WalletUsers {
-  UserId                                                                 Int                    @id(map: "PK__WalletUs__1788CC4CB5E63ECC") @default(autoincrement())
-  FullName                                                               String                 @db.NVarChar(120)
-  Email                                                                  String                 @unique(map: "UQ__WalletUs__A9D10534EA58CB7D") @db.NVarChar(255)
-  PasswordHash                                                           Bytes                  @db.VarBinary(32)
-  CreatedAt                                                              DateTime               @default(dbgenerated("sysdatetime()"), map: "DF_WalletUsers_CreatedAt")
-  TransferTransactions_TransferTransactions_RecipientUserIdToWalletUsers TransferTransactions[] @relation("TransferTransactions_RecipientUserIdToWalletUsers")
-  TransferTransactions_TransferTransactions_SenderUserIdToWalletUsers    TransferTransactions[] @relation("TransferTransactions_SenderUserIdToWalletUsers")
+  UserId                                                                 Int                     @id(map: "PK__WalletUs__1788CC4CA686C4C6") @default(autoincrement())
+  FullName                                                               String                  @db.NVarChar(120)
+  Email                                                                  String                  @unique(map: "UQ__WalletUs__A9D10534B24D0D28") @db.NVarChar(255)
+  PasswordHash                                                           Bytes                   @db.VarBinary(32)
+  CreatedAt                                                              DateTime                @default(dbgenerated("sysdatetime()"), map: "DF_WalletUsers_CreatedAt")
+  Budgets                                                                Budgets[]
+  MoneyRequests_Payer                                                    MoneyRequests[]         @relation("MoneyRequests_PayerToWalletUsers")
+  MoneyRequests_Requester                                                MoneyRequests[]         @relation("MoneyRequests_RequesterToWalletUsers")
+  Notifications                                                          Notifications[]
+  RecurringTransfers_RecurringTransfers_RecipientUserIdToWalletUsers     RecurringTransfers[]    @relation("RecurringTransfers_RecipientUserIdToWalletUsers")
+  RecurringTransfers_RecurringTransfers_SenderUserIdToWalletUsers        RecurringTransfers[]    @relation("RecurringTransfers_SenderUserIdToWalletUsers")
+  SplitBillParticipants                                                  SplitBillParticipants[]
+  SplitBills                                                             SplitBills[]
+  TransferTransactions_TransferTransactions_RecipientUserIdToWalletUsers TransferTransactions[]  @relation("TransferTransactions_RecipientUserIdToWalletUsers")
+  TransferTransactions_TransferTransactions_SenderUserIdToWalletUsers    TransferTransactions[]  @relation("TransferTransactions_SenderUserIdToWalletUsers")
   WalletAccounts                                                         WalletAccounts?
-  MoneyRequests_Requester                                                MoneyRequests[]        @relation("MoneyRequests_RequesterToWalletUsers")
-  MoneyRequests_Payer                                                    MoneyRequests[]        @relation("MoneyRequests_PayerToWalletUsers")
+}
+
+model Accounts {
+  AccountId                                         Int            @id(map: "PK__Accounts__349DA5A6B98741F4") @default(autoincrement())
+  AccountName                                       String         @db.NVarChar(100)
+  Balance                                           Decimal        @db.Decimal(18, 2)
+  AuditLogs                                         AuditLogs[]
+  Transactions_Transactions_FromAccountIdToAccounts Transactions[] @relation("Transactions_FromAccountIdToAccounts")
+  Transactions_Transactions_ToAccountIdToAccounts   Transactions[] @relation("Transactions_ToAccountIdToAccounts")
+}
+
+model AuditLogs {
+  LogId      Int       @id(map: "PK__AuditLog__5E548648FF3ECFB8") @default(autoincrement())
+  AccountId  Int?
+  OldBalance Decimal?  @db.Decimal(18, 2)
+  NewBalance Decimal?  @db.Decimal(18, 2)
+  ActionDate DateTime? @default(now(), map: "DF__AuditLogs__Actio__778AC167") @db.DateTime
+  Accounts   Accounts? @relation(fields: [AccountId], references: [AccountId], onDelete: NoAction, onUpdate: NoAction, map: "FK__AuditLogs__Accou__787EE5A0")
+}
+
+model Budgets {
+  BudgetId     Int         @id(map: "PK__Budgets__E38E7924FB19B991") @default(autoincrement())
+  UserId       Int
+  Tag          String?     @db.NVarChar(40)
+  MonthlyLimit Decimal     @db.Decimal(18, 2)
+  CreatedAt    DateTime    @default(dbgenerated("sysdatetime()"), map: "DF_Budgets_CreatedAt")
+  UpdatedAt    DateTime    @default(dbgenerated("sysdatetime()"), map: "DF_Budgets_UpdatedAt")
+  WalletUsers  WalletUsers @relation(fields: [UserId], references: [UserId], onUpdate: NoAction, map: "FK_Budgets_User")
+
+  @@unique([UserId, Tag], map: "UQ_Budgets_PerUserTag")
+}
+
+model Notifications {
+  NotificationId Int         @id(map: "PK__Notifica__20CF2E12874EC0C8") @default(autoincrement())
+  UserId         Int
+  Type           String      @db.NVarChar(40)
+  Title          String      @db.NVarChar(120)
+  Body           String?     @db.NVarChar(500)
+  ReferenceId    Int?
+  IsRead         Boolean     @default(false, map: "DF_Notifications_IsRead")
+  CreatedAt      DateTime    @default(dbgenerated("sysdatetime()"), map: "DF_Notifications_CreatedAt")
+  WalletUsers    WalletUsers @relation(fields: [UserId], references: [UserId], onUpdate: NoAction, map: "FK_Notifications_User")
+}
+
+model RecurringTransfers {
+  RecurringId                                                 Int         @id(map: "PK__Recurrin__738186E29706C4D8") @default(autoincrement())
+  SenderUserId                                                Int
+  RecipientUserId                                             Int
+  Amount                                                      Decimal     @db.Decimal(18, 2)
+  Memo                                                        String?     @db.NVarChar(160)
+  Tag                                                         String?     @db.NVarChar(40)
+  Frequency                                                   String      @db.NVarChar(20)
+  NextRunDate                                                 DateTime    @db.Date
+  LastRunDate                                                 DateTime?   @db.Date
+  IsActive                                                    Boolean     @default(true, map: "DF_RecurringTransfers_IsActive")
+  CreatedAt                                                   DateTime    @default(dbgenerated("sysdatetime()"), map: "DF_RecurringTransfers_CreatedAt")
+  WalletUsers_RecurringTransfers_RecipientUserIdToWalletUsers WalletUsers @relation("RecurringTransfers_RecipientUserIdToWalletUsers", fields: [RecipientUserId], references: [UserId], onUpdate: NoAction, map: "FK_RecurringTransfers_Recipient")
+  WalletUsers_RecurringTransfers_SenderUserIdToWalletUsers    WalletUsers @relation("RecurringTransfers_SenderUserIdToWalletUsers", fields: [SenderUserId], references: [UserId], onUpdate: NoAction, map: "FK_RecurringTransfers_Sender")
+}
+
+model SplitBillParticipants {
+  ParticipantId Int            @id(map: "PK__SplitBil__7227995ECD89A496") @default(autoincrement())
+  SplitBillId   Int
+  UserId        Int
+  ShareAmount   Decimal        @db.Decimal(18, 2)
+  RequestId     Int?
+  Status        String         @default("pending", map: "DF_SplitBillParticipants_Status") @db.NVarChar(20)
+  MoneyRequests MoneyRequests? @relation(fields: [RequestId], references: [RequestId], onDelete: NoAction, onUpdate: NoAction, map: "FK_SplitBillParticipants_Request")
+  SplitBills    SplitBills     @relation(fields: [SplitBillId], references: [SplitBillId], onUpdate: NoAction, map: "FK_SplitBillParticipants_SplitBill")
+  WalletUsers   WalletUsers    @relation(fields: [UserId], references: [UserId], onUpdate: NoAction, map: "FK_SplitBillParticipants_User")
+
+  @@unique([SplitBillId, UserId], map: "UQ_SplitBillParticipants_PerBill")
+}
+
+model SplitBills {
+  SplitBillId           Int                     @id(map: "PK__SplitBil__DB3C35B0C2BCD5BE") @default(autoincrement())
+  CreatorUserId         Int
+  Description           String                  @db.NVarChar(160)
+  TotalAmount           Decimal                 @db.Decimal(18, 2)
+  SplitMethod           String                  @default("equal", map: "DF_SplitBills_SplitMethod") @db.NVarChar(20)
+  Status                String                  @default("open", map: "DF_SplitBills_Status") @db.NVarChar(20)
+  CreatedAt             DateTime                @default(dbgenerated("sysdatetime()"), map: "DF_SplitBills_CreatedAt")
+  SplitBillParticipants SplitBillParticipants[]
+  WalletUsers           WalletUsers             @relation(fields: [CreatorUserId], references: [UserId], onUpdate: NoAction, map: "FK_SplitBills_Creator")
+}
+
+model Transactions {
+  TransactionId                                 Int       @id(map: "PK__Transact__55433A6BF0847D4E") @default(autoincrement())
+  FromAccountId                                 Int?
+  ToAccountId                                   Int?
+  Amount                                        Decimal   @db.Decimal(18, 2)
+  CreatedAt                                     DateTime? @default(now(), map: "DF__Transacti__Creat__72C60C4A") @db.DateTime
+  Accounts_Transactions_FromAccountIdToAccounts Accounts? @relation("Transactions_FromAccountIdToAccounts", fields: [FromAccountId], references: [AccountId], onDelete: NoAction, onUpdate: NoAction, map: "FK__Transacti__FromA__73BA3083")
+  Accounts_Transactions_ToAccountIdToAccounts   Accounts? @relation("Transactions_ToAccountIdToAccounts", fields: [ToAccountId], references: [AccountId], onDelete: NoAction, onUpdate: NoAction, map: "FK__Transacti__ToAcc__74AE54BC")
 }
