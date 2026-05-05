@@ -324,9 +324,15 @@ export default function DashboardShell({ dbError, initialData, session }) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    const interval = setInterval(() => {
+      fetchNotifications();
+      setRefreshKey((k) => k + 1);
+      startTransition(() => {
+        router.refresh();
+      });
+    }, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, router, startTransition]);
 
   useEffect(() => {
     if (activeTab === "overview") {
