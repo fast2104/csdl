@@ -16,6 +16,7 @@ export async function POST(request) {
     const recipientUserId = Number(body?.recipientUserId);
     const amount = Number(body?.amount);
     const memo = body?.memo?.trim() || null;
+    const tag = body?.tag?.trim() || null;
 
     if (!Number.isInteger(recipientUserId) || recipientUserId <= 0) {
       return NextResponse.json(
@@ -36,6 +37,7 @@ export async function POST(request) {
       recipientUserId,
       amount,
       memo,
+      tag,
     });
 
     return NextResponse.json({ ok: true, result });
