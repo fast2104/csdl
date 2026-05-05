@@ -1020,29 +1020,31 @@ export default function DashboardShell({ dbError, initialData, session }) {
                 </article>
               </div>
 
-              <article className="surface-card wide-card">
-                <div className="section-heading">
-                  <h2>Spending by tag</h2>
-                  <span>{expenseStats.byTag.length} tags</span>
-                </div>
-                {expenseStats.byTag.length ? (
-                  <PieChart data={expenseStats.byTag} />
-                ) : (
-                  <p className="empty-copy">No outgoing transfers in this period.</p>
-                )}
-              </article>
+              <div className="stats-pie-row">
+                <article className="surface-card">
+                  <div className="section-heading">
+                    <h2>Spending by tag</h2>
+                    <span>{expenseStats.byTag.length} tags</span>
+                  </div>
+                  {expenseStats.byTag.length ? (
+                    <PieChart data={expenseStats.byTag} />
+                  ) : (
+                    <p className="empty-copy">No outgoing transfers in this period.</p>
+                  )}
+                </article>
 
-              <article className="surface-card wide-card">
-                <div className="section-heading">
-                  <h2>Receiving by tag</h2>
-                  <span>{expenseStats.receivedByTag?.length || 0} tags</span>
-                </div>
-                {expenseStats.receivedByTag?.length ? (
-                  <PieChart data={expenseStats.receivedByTag} />
-                ) : (
-                  <p className="empty-copy">No incoming transfers in this period.</p>
-                )}
-              </article>
+                <article className="surface-card">
+                  <div className="section-heading">
+                    <h2>Receiving by tag</h2>
+                    <span>{expenseStats.receivedByTag?.length || 0} tags</span>
+                  </div>
+                  {expenseStats.receivedByTag?.length ? (
+                    <PieChart data={expenseStats.receivedByTag} />
+                  ) : (
+                    <p className="empty-copy">No incoming transfers in this period.</p>
+                  )}
+                </article>
+              </div>
 
               <article className="surface-card wide-card">
                 <div className="section-heading">

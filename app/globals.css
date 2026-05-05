@@ -792,6 +792,12 @@ input {
   gap: 8px;
 }
 
+.stats-pie-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
 .stats-summary-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -938,13 +944,20 @@ input {
    ============================================== */
 
 .form-select {
-  padding: 10px 12px;
+  width: 100%;
+  padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
   font-size: 0.95rem;
   color: var(--ink);
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M1.4 0L6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
 }
 
 /* ==============================================
@@ -962,6 +975,10 @@ input {
    ============================================== */
 
 @media (max-width: 720px) {
+  .stats-pie-row {
+    grid-template-columns: 1fr;
+  }
+
   .pie-chart-container {
     flex-direction: column;
     align-items: flex-start;
