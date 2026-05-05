@@ -786,15 +786,25 @@ BEGIN
     FROM dbo.Budgets b
     LEFT JOIN (
         SELECT
-            ISNULL(t.Tag, 'Overall') AS MatchTag,
+            ISNULL(t.Tag, 'Uncategorized') AS MatchTag,
             SUM(t.Amount) AS Total
         FROM dbo.TransferTransactions t
         WHERE t.SenderUserId = @UserId
           AND t.CreatedAt >= @StartDate
           AND t.CreatedAt < @EndDate
-        GROUP BY ISNULL(t.Tag, 'Overall')
+        GROUP BY ISNULL(t.Tag, 'Uncategorized')
+
+        UNION ALL
+
+        SELECT
+            '__OVERALL__' AS MatchTag,
+            SUM(t.Amount) AS Total
+        FROM dbo.TransferTransactions t
+        WHERE t.SenderUserId = @UserId
+          AND t.CreatedAt >= @StartDate
+          AND t.CreatedAt < @EndDate
     ) spent ON (
-        (b.Tag IS NULL AND spent.MatchTag = 'Overall')
+        (b.Tag IS NULL AND spent.MatchTag = '__OVERALL__')
         OR b.Tag = spent.MatchTag
     )
     WHERE b.UserId = @UserId
@@ -1063,6 +1073,17 @@ BEGIN
 
             IF @SenderBalance < @Amount
             BEGIN
+                DECLARE @SkipNextRunDate DATE = CASE @Frequency
+                    WHEN 'daily' THEN DATEADD(DAY, 1, @Today)
+                    WHEN 'weekly' THEN DATEADD(WEEK, 1, @Today)
+                    WHEN 'biweekly' THEN DATEADD(WEEK, 2, @Today)
+                    WHEN 'monthly' THEN DATEADD(MONTH, 1, @Today)
+                END;
+
+                UPDATE dbo.RecurringTransfers
+                SET NextRunDate = @SkipNextRunDate
+                WHERE RecurringId = @RecurringId;
+
                 INSERT INTO dbo.Notifications (UserId, Type, Title, Body, ReferenceId)
                 VALUES (@SenderUserId, 'recurring_failed',
                     'Recurring transfer failed',

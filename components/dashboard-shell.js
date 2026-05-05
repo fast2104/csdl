@@ -254,6 +254,7 @@ export default function DashboardShell({ dbError, initialData, session }) {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [, startBackgroundTransition] = useTransition();
   const [transactionModal, setTransactionModal] = useState({
     open: false,
     status: "idle",
@@ -327,12 +328,12 @@ export default function DashboardShell({ dbError, initialData, session }) {
     const interval = setInterval(() => {
       fetchNotifications();
       setRefreshKey((k) => k + 1);
-      startTransition(() => {
+      startBackgroundTransition(() => {
         router.refresh();
       });
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications, router, startTransition]);
+  }, [fetchNotifications, router, startBackgroundTransition]);
 
   useEffect(() => {
     if (activeTab === "overview") {
