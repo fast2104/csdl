@@ -1095,19 +1095,16 @@ export default function DashboardShell({ dbError, initialData, session }) {
             <form className="transfer-form" onSubmit={handleUpsertBudget}>
               <label>
                 Tag (leave blank for overall budget)
-                <input
-                  list="budget-tag-suggestions"
-                  maxLength={40}
+                <select
+                  className="form-select"
                   onChange={(e) => setBudgetTag(e.target.value)}
-                  placeholder="e.g. Food, Transport, or blank for Overall"
-                  type="text"
                   value={budgetTag}
-                />
-                <datalist id="budget-tag-suggestions">
+                >
+                  <option value="">Overall (all tags)</option>
                   {TAG_SUGGESTIONS.map((t) => (
-                    <option key={t} value={t} />
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </datalist>
+                </select>
               </label>
               <label>
                 Monthly limit
@@ -1253,19 +1250,16 @@ export default function DashboardShell({ dbError, initialData, session }) {
 
               <label>
                 Tag (optional)
-                <input
-                  list="transfer-tag-suggestions"
-                  maxLength={40}
+                <select
+                  className="form-select"
                   onChange={(event) => setTransferTag(event.target.value)}
-                  placeholder="e.g. Food, Transport, Rent"
-                  type="text"
                   value={transferTag}
-                />
-                <datalist id="transfer-tag-suggestions">
+                >
+                  <option value="">No tag</option>
                   {TAG_SUGGESTIONS.map((t) => (
-                    <option key={t} value={t} />
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </datalist>
+                </select>
               </label>
 
               <button className="primary-button" disabled={isPending} type="submit">
@@ -1346,19 +1340,16 @@ export default function DashboardShell({ dbError, initialData, session }) {
               </label>
               <label>
                 Tag (optional)
-                <input
-                  list="recurring-tag-suggestions"
-                  maxLength={40}
+                <select
+                  className="form-select"
                   onChange={(e) => setRecurringTag(e.target.value)}
-                  placeholder="e.g. Rent, Subscription"
-                  type="text"
                   value={recurringTag}
-                />
-                <datalist id="recurring-tag-suggestions">
+                >
+                  <option value="">No tag</option>
                   {TAG_SUGGESTIONS.map((t) => (
-                    <option key={t} value={t} />
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </datalist>
+                </select>
               </label>
               <button className="primary-button" type="submit">
                 Create recurring transfer
